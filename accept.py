@@ -122,16 +122,23 @@ def get_local_storage():
     return localStoragePy("xsuto.accept-lol.app", "json")
 
 
-def accept_game(acceptBtn, inLobby):
-    in_lobby = False
+def accept_game(acceptBtn, inLobby, dodge_message):
+    did_accept = False
     print("Waiting for game stage")
-    while not in_lobby:
-        find_template_on_image(screenshot(), acceptBtn, True)
-        in_lobby = find_template_on_image(
-            screenshot_of_app_in_background(WINDOW_NAME), inLobby
-        )
-        if in_lobby:
+    while True:
+        lol_only_screenshot = screenshot_of_app_in_background(WINDOW_NAME)
+        if find_template_on_image(lol_only_screenshot, inLobby):
             break
+
+        # If we did accept then we shouldn't press button unless we can find dodge message
+        did_accept = (
+            find_template_on_image(screenshot(), acceptBtn, not did_accept)
+            or did_accept
+        )
+
+        if find_template_on_image(lol_only_screenshot, dodge_message):
+            did_accept = False
+
         sleep(1)
 
 
@@ -202,12 +209,15 @@ def main():
         np.fromstring(string_encoded_accept_btn_template, np.uint8, sep=","), -1
     )
     lock_in = cv2.imdecode(np.fromstring(string_encoded_lock_in, np.uint8, sep=","), -1)
+    dodge_message = cv2.imdecode(
+        np.fromstring(string_encoded_dodge_message, np.uint8, sep=","), -1
+    )
 
     # Find game
     look_for_a_game(find_match)
 
     # Accept game
-    accept_game(accept_btn, in_lobby)
+    accept_game(accept_btn, in_lobby, dodge_message)
 
     # Selecet champion that you want to play
     if not pickChamp or not banChamp:
