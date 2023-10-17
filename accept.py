@@ -22,16 +22,6 @@ from cv2 import Mat
 WINDOW_NAME = "League of Legends"
 
 
-SELETED_CHAMP_X = 725
-SELETED_CHAMP_Y = 275
-
-
-SEARCH_CHAMPION_INPUT_X = 1500
-SEARCH_CHAMPION_INPUT_Y = 190
-
-CONFIRM_BUTTON_X = 1200
-CONFIRM_BUTTON_Y = 1130
-
 
 def screenshot_of_app_in_background(window_name: str):
     hwnd = win32gui.FindWindow(None, window_name)
@@ -78,15 +68,20 @@ def mouseClick(x: int, y: int):
     mouseController.press(Button.left)
     mouseController.release(Button.left)
 
+def delete_word_and_type_at(delete_word: str, text: str, x: str, y:str):
+    it = "\b" * len(delete_word)
+    it += text 
+    typeAt(it, x, y)
 
 def typeAt(text: str, x: int, y: int):
     keyboard = Controller()
     mouseClick(x, y)
+    mouseClick(x, y)
     keyboard.type(text)
 
 
-def find_template_on_image(image: Mat, template: Mat, shouldClick=False, callback=()):
-    found, loc, w, h = match_template(image, template)
+def find_template_on_image(image: Mat, template: Mat, shouldClick=False, callback=(), threshold = 0.9):
+    found, loc, w, h = match_template(image, template, threshold)
     callback
     if found:
         if shouldClick:
@@ -144,11 +139,9 @@ def accept_game(acceptBtn: Mat, inLobby: Mat, dodge_message: Mat):
         sleep(1)
 
 
-def select_champion(champion: str, x: int, y: int):
-    typeAt(champion, x + SEARCH_CHAMPION_INPUT_X, y + SEARCH_CHAMPION_INPUT_Y)
+def select_champion(champion: str,x: int, y: int):
+    typeAt(champion, x, y)
     sleep(0.5)
-    mouseClick(x + SELETED_CHAMP_X, y + SELETED_CHAMP_Y)
-    mouseClick(x + SELETED_CHAMP_X, y + SELETED_CHAMP_Y)
 
 
 def focus_window(window_name: str):
@@ -234,57 +227,83 @@ def load_img_from_string(str):
 
 
 def main():
-
     # Make program aware of DPI scaling
     user32 = windll.user32
     user32.SetProcessDPIAware()
 
     # Get args
+    print("Make sure to run client in 1600x900 resolution, you can change that in settings")
     banChamp, pickChamp = get_args()
     print(banChamp, pickChamp)
 
     # Load templates
-    in_lobby = load_img_from_string(string_encoded_lobby_template)
-    find_match = load_img_from_string(string_encoded_find_match_template)
-    accept_btn = load_img_from_string(string_encoded_accept_btn_template)
-    lock_in = load_img_from_string(string_encoded_lock_in)
-    ban_champion_stage = load_img_from_string(string_encoded_ban_champion)
-    dodge_message = load_img_from_string(string_encoded_dodge_message)
+    find_match = cv2.imread("./find.png", 0)
+    accept_btn = cv2.imread("./accept.png", 0)
+    dodge_message = cv2.imread("./dodge.png", 0)
+    in_lobby = cv2.imread("./lobby.png", 0)
+    ban_champion_stage = cv2.imread("./ban_stage.png", 0)
+    ban_btn = cv2.imread("./ban_btn.png", 0)
+    search = cv2.imread("./search.png", 0)
+    ban_search = cv2.imread("./ban_search.png", 0)
+    lock_in = cv2.imread("./lock.png", 0)
+    cv2.waitKey(0)
 
     # Find game
     look_for_a_game(find_match)
 
     # Accept game
     accept_game(accept_btn, in_lobby, dodge_message)
+    x, y, w, h = get_lol_position()
+
+    SELETED_CHAMP_X = 480
+    SELETED_CHAMP_Y = 210
 
     # Selecet champion that you want to play
-
     if pickChamp:
         print("Select champion stage")
         sleep(5)
+        focus_window(WINDOW_NAME)
+        while True:
+            found, loc, w, h = match_template(screenshot(), search)
+            if found:
+                print("Ready to select champ")
+                select_champion(pickChamp, loc[0] + w / 2, loc[1] + h / 2)
+                break
+        sleep(0.5)
         x, y, w, h = get_lol_position()
         focus_window(WINDOW_NAME)
-        select_champion(pickChamp, x, y)
+        mouseClick(x + SELETED_CHAMP_X, y + SELETED_CHAMP_Y)
 
     # BAN CHAMP
     if banChamp:
         print("Ban champion stage")
         while not find_template_on_image(
-            screenshot_of_app_in_background(WINDOW_NAME), ban_champion_stage
+            screenshot_of_app_in_background(WINDOW_NAME), ban_champion_stage, threshold=0.85
         ):
             sleep(1)
         sleep(2)
+        focus_window(WINDOW_NAME)
+        print("Looking for ban search")
+        while True:
+            matched, loc, w, h = match_template(screenshot(), ban_search, threshold=0.85)
+            if matched:
+                print("Ready to ban chemp")
+                delete_word_and_type_at(pickChamp, banChamp, loc[0] + w / 2, loc[1] + h / 2)
+                break
+        sleep(0.5)
         x, y, w, h = get_lol_position()
         focus_window(WINDOW_NAME)
-        select_champion(banChamp, x, y)
+        mouseClick(x + SELETED_CHAMP_X, y + SELETED_CHAMP_Y)
         sleep(0.5)
-        mouseClick(x + CONFIRM_BUTTON_X, y + CONFIRM_BUTTON_Y)
-
+        find_template_on_image(screenshot(), ban_btn, True) 
+        sleep(5)
+    
+    
     # PICK CHAMP
     if pickChamp:
         print("Pick Champion stage")
         while not find_template_on_image(screenshot(), lock_in, True):
-            sleep(3)
+            sleep(1)
 
 
 main()
